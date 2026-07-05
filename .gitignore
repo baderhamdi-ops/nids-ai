@@ -1,0 +1,9 @@
+venv/
+node_modules/
+__pycache__/
+*.pyc
+ml/data/**/*.csv
+ml/models/*.joblib
+ml/models/*.keras
+.env
+*.log

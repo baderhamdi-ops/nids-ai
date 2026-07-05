@@ -1,32 +1,54 @@
-version: "3.9"
-
 services:
-  backend:
-    build: ./backend
-    ports:
-      - "8000:8000"
+  postgres:
+    image: postgres:16-alpine
+    container_name: nids_postgres
+    restart: unless-stopped
     environment:
-      - DATABASE_URL=postgresql://nids:nids123@db:5432/nidsdb
-      - REDIS_URL=redis://redis:6379
-    depends_on:
-      - db
-      - redis
-
-  db:
-    image: postgres:15
-    environment:
-      POSTGRES_USER: nids
-      POSTGRES_PASSWORD: nids123
-      POSTGRES_DB: nidsdb
+      POSTGRES_USER: nids_user
+      POSTGRES_PASSWORD: nids_password
+      POSTGRES_DB: nids_db
     ports:
       - "5432:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - nids_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nids_user -d nids_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
-  redis:
-    image: redis:7
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: nids_backend
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: nids_user
+      POSTGRES_PASSWORD: nids_password
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: nids_db
+      MODEL_PATH: /app/ml/models/best_model.joblib
+      FEAT_PATH: /app/ml/models/feature_names.joblib
     ports:
-      - "6379:6379"
+      - "8000:8000"
+    volumes:
+      - ./ml/models:/app/ml/models:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: nids_frontend
+    restart: unless-stopped
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
 
 volumes:
-  postgres_data:
+  nids_pg_data:
